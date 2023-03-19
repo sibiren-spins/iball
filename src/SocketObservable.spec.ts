@@ -72,7 +72,7 @@ describe('SocketObservable', () => {
       send(sendMessage);
     }
     await new Promise(res => setTimeout(res, 10000));
-    assert.deepStrictEqual(messages, receivedMessages);
+    assert.deepStrictEqual(receivedMessages, messages);
   })
 
   it('should transform a stream of messages', async () => {
