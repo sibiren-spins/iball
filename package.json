@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test -r ts-node/register src/*.spec.ts"
   },
-  "author": "",
+  "author": "Cecilia Brewer",
   "license": "UNLICENSED Copyright © 2023 - Cecilia Brewer - All Rights Reserved",
   "devDependencies": {
     "@types/express-ws": "^3.0.1",
