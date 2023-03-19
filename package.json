@@ -1,0 +1,23 @@
+{
+  "name": "iball",
+  "version": "0.0.1",
+  "description": "A fluent, observable API for websockets messaging.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test -r ts-node/register src/*.spec.ts"
+  },
+  "author": "",
+  "license": "UNLICENSED Copyright © 2023 - Cecilia Brewer - All Rights Reserved",
+  "devDependencies": {
+    "@types/express-ws": "^3.0.1",
+    "@types/node": "^18.15.1",
+    "@types/ws": "^8.5.4",
+    "express": "^4.18.2",
+    "express-ws": "^5.0.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "rxjs": "^7.8.0"
+  }
+}
