@@ -21,7 +21,7 @@ describe('SocketObservable', () => {
     app.ws('/', (socket: WebSocket, req, next) => {
       send = socket.send.bind(socket);
       socket.on('message', (message, isBinary) => {
-        if ((message as any as string) === 'is it over?') {
+        if ((message as any as string) === '4') {
           socket.send('?');
         }
       })
@@ -101,18 +101,22 @@ describe('SocketObservable', () => {
     const messages = [{data: 'hi!', messageLength: 3}];
     const innerMessages = [['how', 'are', 'you']];
     const innerInnerMessages = [['today', 'and', 'forever']];
-    const outputMessages = ['hi! how are you today and forever?'];
+    const outputMessages = ['hi! how are you-today-and-forever?'];
     let receivedMessages: string[] = [];
     new SocketObservable(socket)
       .receive((message: {data: string, messageLength: number}) => message)
-      .receive((message: string, state): [typeof state, string] => {
-        if (((arg: any): arg is { data: string, messageLength: number} => arg[0] === undefined)(state)) return [state, message];
-        return [state[0], `${state[1]} ${message}`];
-      }, state => result => !!result && result[1].split(' ').length === state.messageLength)
+      .receive(
+        (message: string, state): [typeof state, string] => {
+          if (!Array.isArray(state)) return [state, message];
+          return [state[0], `${state[1]} ${message}`];
+        },
+        state =>
+          result =>
+            !!result && result[1].split(' ').length === state.messageLength)
       .receive((message: string, state): typeof state => {
-        return [state[0], `${state[1]} ${message}`];
+        return [state[0], `${state[1]}-${message}`];
       }, 3)
-      .send('is it over?')
+      .send(state => state[1].split('-').length)
       .receive((message: string, state) => {
         return `${state[0].data} ${state[1]}` + message;
       })
