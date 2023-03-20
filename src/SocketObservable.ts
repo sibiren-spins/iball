@@ -25,6 +25,9 @@ type BufferLike =
     | { valueOf(): string }
     | { [Symbol.toPrimitive](hint: string): string }
 
+const skipSendSymbol = Symbol('skipSend');
+type SkipSendSymbol = typeof skipSendSymbol;
+
 
 export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
   private dispatcher: SocketMessageDispatcher;
@@ -137,16 +140,18 @@ export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
   }
 
   send(message: BufferLike, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }): SocketObservable<T>;
-  send(messageTransform: (state: Extract<T>) => BufferLike, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }): SocketObservable<T>;
-  send(messageOrMessageTransform: BufferLike | ((state: Extract<T>) => BufferLike), options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }) {
+  send(messageTransform: (state: Extract<T>, skip: () => SkipSendSymbol) => BufferLike | SkipSendSymbol, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }): SocketObservable<T>;
+  send(messageOrMessageTransform: BufferLike | ((state: Extract<T>, skip: () => SkipSendSymbol) => BufferLike | SkipSendSymbol), options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }) {
     this.subscribe(state => {
-      let message: BufferLike;
+      const skip = (): SkipSendSymbol => skipSendSymbol;
+      let message: BufferLike | SkipSendSymbol;
       if (typeof messageOrMessageTransform === 'function') {
-        message = messageOrMessageTransform(state);
+        message = messageOrMessageTransform(state, skip);
       } else {
         message = messageOrMessageTransform;
       }
-      this.socket.send(message, options ?? {}, undefined);
+      if (((skipOrMessage: BufferLike | SkipSendSymbol): skipOrMessage is BufferLike => skipOrMessage!== skipSendSymbol)(message))
+        this.socket.send(message, options ?? {}, undefined);
     })
     return this;
   }
