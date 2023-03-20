@@ -5,8 +5,6 @@ import { Semaphore } from './Semaphore';
 
 type MessageType = string | number | Uint8Array | object;
 
-type Flatten<TInput> = TInput extends SocketObservable<infer R> ? Flatten<R>[] : TInput;
-
 type Extract<TInput> = TInput extends SocketObservable<infer R> ? Extract<R> : TInput;
 
 

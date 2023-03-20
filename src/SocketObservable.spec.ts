@@ -2,7 +2,6 @@ import express from "express";
 import expressWs from "express-ws";
 import { Server } from "http";
 import assert from "node:assert";
-import { nextTick } from "node:process";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import { reduce } from "rxjs";
 import WebSocket from "ws";
@@ -16,35 +15,6 @@ describe('SocketObservable', () => {
   let app: Express.Application & expressWs.Application;
   let server: Server;
   beforeEach(async () => {
-    // socket = {
-    //   _onMessage: [] as ((msg: RawData, isBinary: boolean) => void)[],
-    //   pending: [] as [RawData, boolean][],
-    //   async on(event: 'message', cb: (msg: RawData, isBinary: boolean) => void) {
-    //     (socket as any)._onMessage.push(cb);
-    //     if ((socket as any).pending.length) {
-    //       let pendingMessage: [RawData, boolean];
-    //       while ((socket as any)._onMessage.length && (pendingMessage = (socket as any).pending.shift())) {
-    //         for (const messageHandler of (socket as any)._onMessage) {
-    //           await new Promise<void>(res => nextTick(() => {
-    //             messageHandler(...pendingMessage);
-    //             res();
-    //           }));
-    //         }
-    //       }
-    //     }
-    //     return this;
-    //   },
-    //   off(event: 'message', cb: (msg: RawData, isBinary: boolean) => void) {
-    //     (socket as any)._onMessage = (socket as any)._onMessage.filter((m: any) => m !== cb);
-    //   },
-    //   onmessage: (msg: RawData, isBinary: boolean) => {
-    //     if ((socket as any)._onMessage.length !== 0) {
-    //       (socket as any)._onMessage.forEach((func: any) => func(msg, isBinary));
-    //     } else {
-    //       (socket as any).pending.push([msg, isBinary])
-    //     }
-    //   }
-    // }
     try {
     app = express() as any;
     expressWs(app);
