@@ -136,8 +136,18 @@ export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
     return innerObservable;
   }
 
-  send(message: BufferLike, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }) {
-    this.socket.send(message, options ?? {}, undefined);
+  send(message: BufferLike, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }): SocketObservable<T>;
+  send(messageTransform: (state: Extract<T>) => BufferLike, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }): SocketObservable<T>;
+  send(messageOrMessageTransform: BufferLike | ((state: Extract<T>) => BufferLike), options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }) {
+    this.subscribe(state => {
+      let message: BufferLike;
+      if (typeof messageOrMessageTransform === 'function') {
+        message = messageOrMessageTransform(state);
+      } else {
+        message = messageOrMessageTransform;
+      }
+      this.socket.send(message, options ?? {}, undefined);
+    })
     return this;
   }
 }
