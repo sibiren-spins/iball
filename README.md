@@ -44,13 +44,16 @@ which for this code on the server:
   const $socketObservable = new SocketObservable(socket)
     .send(JSON.stringify({ data: 'hi!', messageLength: 2}));
     "how are you doing today".split(' ').forEach(val => $socketObservable.send(val));
-    $socketObservable.receive((message: string) => {
-      if (message === 4) return '?';
-      return null;
-    })
-    .subscribe(val => {
-      if (val !== null) this.send(val);
-    });
+    $socketObservable
+      .receive((message: string) => {
+        if (message === 4) return '?';
+        return null;
+      })
+      .send((state, skip) => state ?? skip())
+      .subscribe(state => {
+        if (state) socket.close();
+      });
+  
 ```
 will output:
 ```
