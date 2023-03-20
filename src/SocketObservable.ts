@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright © 2023 Cecilia Brewer <cecilia@rainbowhouse.org> */
+
 import { RawData, WebSocket } from 'ws';
 import { ReplaySubject } from 'rxjs';
 import { SocketMessageDispatcher } from './SocketMessageDispatcher';

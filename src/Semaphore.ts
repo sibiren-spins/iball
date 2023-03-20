@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright © 2023 Cecilia Brewer <cecilia@rainbowhouse.org> */
+
 import EventEmitter from "node:events";
 
 type MessagePair = [wait: Promise<void> | null, signal: Promise<void> | null];

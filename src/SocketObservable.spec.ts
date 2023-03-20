@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright © 2023 Cecilia Brewer <cecilia@rainbowhouse.org> */
+
 import express from "express";
 import expressWs from "express-ws";
 import { Server } from "http";
