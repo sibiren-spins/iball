@@ -64,7 +64,7 @@ describe('SocketObservable', () => {
     const messages = ['Hell', 'o', 'Wor', 'ld'];
     const receivedMessages: string[] = [];
     new SocketObservable(socket)
-      .receive((message: string) => message, 4)
+      .receive((message: string) => message)
       .subscribe(message => {
         receivedMessages.push(message);
       })
@@ -81,7 +81,7 @@ describe('SocketObservable', () => {
     const outputMessages = ['156', '256', '356', '456']
     const receivedMessages: string[] = [];
     new SocketObservable(socket)
-      .receive((message: number) => message, 4)
+      .receive((message: number) => message)
       .receive((message: number, state) => {
         return state.toString() + message.toString()
       }, 2)
