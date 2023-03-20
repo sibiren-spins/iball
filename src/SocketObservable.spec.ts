@@ -98,6 +98,30 @@ describe('SocketObservable', () => {
     assert.deepStrictEqual(receivedMessages, outputMessages);
   })
 
+  it('should transform an indeterminate stream of messages', async () => {
+    const messages = [1, 2, 3, 4];
+    const innerMessages = [['a'], ['a','a'], ['a','a','a'], ['a','a','a','a']];
+    const outputMessages = ['a', 'aa', 'aaa', 'aaaa'];
+    const receivedMessages: string[] = [];
+    new SocketObservable(socket)
+      .receive((message: number) => message)
+      .receive((message: string, state) => {
+        if (typeof state === 'number') return message;
+        return (state as string) + message;
+      }, state => result => !!result && result.length === state)
+      .subscribe(val => {
+        receivedMessages.push(val);
+      })
+      for (const msgIndex in messages) {
+        send(messages[msgIndex]);
+        for (const innerMessage of innerMessages[msgIndex]) {
+          send(innerMessage);
+        }
+      }
+      await new Promise(res => setTimeout(res, 10000));
+      assert.deepStrictEqual(receivedMessages, outputMessages);
+  })
+
   afterEach(() => {
     socket.close();
     ~socket;
