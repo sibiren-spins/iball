@@ -1,7 +1,7 @@
 import { RawData, WebSocket } from 'ws';
 import { Observable, Observer, ReplaySubject, Subject, Subscription } from 'rxjs';
 import { randomUUID } from 'node:crypto';
-import { Mutex, SemaphoreBasic } from './Mutex';
+import { Mutex, SemaphoreBasic, SemaphoreQueue } from './Mutex';
 import { nextTick } from 'node:process';
 
 type MessageType = string | number | Uint8Array | object;
@@ -85,45 +85,54 @@ class SocketMessageDispatcher implements AsyncGenerator<[RawData, boolean]> {
   constructor(private socket: WebSocket) {
     this.messageMutex.lock();
     this.messageGenerator = this.getMessage();
-    this.messageGenerator.next();
     const messageHandler = async (message: RawData, isBinary: boolean) => {
-      this.messageQueue.push([message, isBinary]);
+      this.messageQueue.push([message, isBinary ?? false]);
       await this.messageSemaphore.signal();
-      this.socket.once('message', messageHandler);
     };
-    this.socket.once('message', messageHandler);
+    this.socket.on('message', messageHandler);
   }
 
   messageMutex = new Mutex();
-  messageSemaphore = new SemaphoreBasic();
+  messageSemaphore = new SemaphoreQueue();
   messageQueue: any[] = [];
+
+  handlerSemaphore = new SemaphoreQueue();
 
   messageGenerator: AsyncGenerator<[RawData, boolean], void>
 
+  get available() {
+    return this.socket.readyState === this.socket.OPEN || this.messageQueue.length > 0;
+  }
+
   async *getMessage(): AsyncGenerator<[RawData, boolean], void, [RawData, boolean]> {
-    if (this.socket.readyState !== this.socket.OPEN) await new Promise<void>((res, rej) => {
-      const resolver = () => {
-        this.socket.off('open', resolver);
-        res();
-      }
-      this.socket.on('open', resolver);
-      setTimeout(rej, 10000);
-    })
-    while (this.socket.readyState === this.socket.OPEN) {
+    if (this.socket.readyState !== this.socket.OPEN) await this.waitForSocketOpen();
+    while (this.available) {
       await this.messageSemaphore.wait();
       const message = this.messageQueue.shift();
       yield message;
     }
+    console.log('socket closed.');
   }
 
-  async next(...args: [] | [unknown]): Promise<IteratorResult<[RawData, boolean], any>> {
+  waitForSocketOpen() {
+    return new Promise<void>((res, rej) => {
+      const resolver = () => {
+        this.socket.off('open', resolver);
+        res();
+      };
+      this.socket.on('open', resolver);
+      setTimeout(rej, 10000);
+    });
+  }
+
+  async next(...args: [] | [unknown]): Promise<IteratorResult<[RawData, boolean], void>> {
     return await this.messageGenerator.next(...args);
   }
 
-  async return(value: any): Promise<IteratorResult<[RawData, boolean], any>> {
+  async return(value: any): Promise<IteratorResult<[RawData, boolean], void>> {
     return await this.messageGenerator.return(value);
   }
-  async throw(e: any): Promise<IteratorResult<[RawData, boolean], any>> {
+  async throw(e: any): Promise<IteratorResult<[RawData, boolean], void>> {
     return await this.messageGenerator.throw(e);
   }
   [Symbol.asyncIterator](): AsyncGenerator<[RawData, boolean], any, unknown> {
@@ -144,7 +153,16 @@ export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
     super();
     if (this.dispatcher === null) {
       this.dispatcher = new SocketMessageDispatcher(this.socket);
+      this.beginEmitLoop();
+    }
+  }
+
+  async beginEmitLoop() {
+    if (!this.dispatcher) throw new Error('Dispatcher vanished.')
+    if (!this.dispatcher.available) await this.dispatcher.waitForSocketOpen();
+    while (this.dispatcher.available) {
       this.next(undefined as any);
+      await this.dispatcher.handlerSemaphore.waitAll();
     }
   }
 
@@ -168,16 +186,18 @@ export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
     }
   }
 
-  receive<TMessage extends MessageType, TReturn, TExpect extends number | ((state: Extract<T>) => number) | ((state: Extract<T>) => (() => boolean))>(
+  receive<TMessage extends MessageType, TReturn, TExpect extends number | ((state: Extract<T>) => number) | ((state: Extract<T>) => ((intermediate: Extract<TReturn>) => boolean))>(
     handler: (message: TMessage, state: Extract<T>) => TReturn | Promise<TReturn>,
     expect?: TExpect
 //    ): [TExpect] extends [number | ((state: Extract<T>) => number) | ((state: Extract<T>) => (() => boolean))] ? SocketObservable<SocketObservable<TReturn>> : SocketObservable<TReturn> {
   ): SocketObservable<TReturn> {
     const innerObservable: SocketObservable<TReturn> = new SocketObservable(this.socket, this.dispatcher);
     this.subscribe((state: Extract<T>) => {
+      let loopState: Extract<TReturn>;
+      this.dispatcher?.handlerSemaphore.wait();
       // receive message
       // create next observable listening to next on this one
-      let iterationDeterminator: undefined | number | (() => boolean) = undefined;
+      let iterationDeterminator: undefined | number | ((intermediate: Extract<TReturn>) => boolean) = undefined;
       let loop: (func: () => Promise<void>) => Promise<void>;
       if (typeof expect === 'number') {
         iterationDeterminator = expect;
@@ -197,7 +217,7 @@ export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
       } else {
         const iterationCondition = iterationDeterminator;
         loop = async func => {
-          while (!iterationCondition()) {
+          while (!iterationCondition(loopState)) {
             await func();
           }
         }
@@ -205,10 +225,17 @@ export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
 
       loop(async () => {
         //const message = await this.getSocketMessage<TMessage>();
-        const message = (await this.dispatcher?.next())?.value;
-        const nextVal: Extract<TReturn> = (await handler(message, state)) as Extract<TReturn>;
-        innerObservable.next?.(nextVal);
-      }).catch(err => this.error?.(err)).then(() => this.complete?.())
+        if (!this.dispatcher) throw new Error('Dispatcher vanished.');
+        
+        const result = await this.dispatcher.next();
+        if (!result.value) throw new Error('No value was returned and one was expected.');
+        const message = result.value;
+        const parsedMessage = this.parseMessage<TMessage>(...message);
+        loopState = (await handler(parsedMessage, loopState as any ?? state)) as Extract<TReturn>;
+      }).catch(err => this.error?.(err)).then(() => {
+        innerObservable.next?.(loopState);
+        this.dispatcher?.handlerSemaphore.signal();
+      })
     });
     return innerObservable;
   }
