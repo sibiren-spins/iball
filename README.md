@@ -8,26 +8,34 @@ is a library that provides an RXJS-compatible observable API for dealing with We
 
   const socket = new WebSocket('ws://example.org');
   new SocketObservable(socket)
-    .receive((message: {data: string, messageLength: number}) => message) // the output of each message handler is given as state to the next
+    // the output of each message handler is given as state to the next
+    .receive((message: {data: string, messageLength: number}) => message)
     .receive(
       (message: string, state): [typeof state, string] => {
         if (!Array.isArray(state)) return [state, message];
         return [state[0], `${state[1]} ${message}`];
       },
-      state => // a dynamic expect() receives the initial state, as well as the output of the message handler after each iteration
-        result => 
-          !!result && result[1].split(' ').length === state.messageLength) // we expect to receive the number of messages specified by our metadata
+      // a dynamic expect() receives the initial state, as well as the output of the message handler after each iteration
+      state =>
+        result =>
+          // we expect to receive the number of messages specified by our metadata
+          !!result && result[1].split(' ').length === state.messageLength) 
     .receive(
       (message: string, state): typeof state => {
-        return [state[0], `${state[1]}-${message}`]; // we'll join these differently
-      }, 
-      3) // this time we expect to receive three messages of the same type
-    .send(state => state[1].split('-').length) // we can send messages mid-stream as well
+        // we'll join these differently
+        return [state[0], `${state[1]}-${message}`];
+      },
+      // this time we expect to receive three messages of the same type
+      3)
+    // we can send messages mid-stream as well
+    .send(state => state[1].split('-').length)
     .receive((message: string) => {
       return `${state[0].data} ${state[1]}` + message;
     })
-    .pipe( // we can use rxjs' operators on our stream as well
-      reduce((acc, val) => { // so we'll wait for our peer to send all of its messages and close the socket
+    // we can use rxjs' operators on our stream as well
+    .pipe(
+      // so we'll wait for our peer to send all of its messages and close the socket
+      reduce((acc, val) => {
         acc.push(val);
         return acc;
       }, [] as string[]
