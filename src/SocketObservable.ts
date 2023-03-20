@@ -1,8 +1,7 @@
 import { RawData, WebSocket } from 'ws';
-import { Observable, Observer, ReplaySubject, Subject, Subscription } from 'rxjs';
+import { ReplaySubject } from 'rxjs';
 import { randomUUID } from 'node:crypto';
-import { Mutex, SemaphoreBasic, SemaphoreQueue } from './Mutex';
-import { nextTick } from 'node:process';
+import { Semaphore } from './Semaphore';
 
 type MessageType = string | number | Uint8Array | object;
 
@@ -10,80 +9,8 @@ type Flatten<TInput> = TInput extends SocketObservable<infer R> ? Flatten<R>[] :
 
 type Extract<TInput> = TInput extends SocketObservable<infer R> ? Extract<R> : TInput;
 
-type SocketObservableType<T> = SocketObservable<T> | SocketObservable<T>
-
-/*
- *
- *
- * Make same observable reusable for a new sequence of messages- treat values as items in a collection like usual
- * 
- */
-
-
-// const socketObs = getObservable();
-
-// socketObs
-//   .receive((fileCount: number) => fileCount)
-//   .receive(async (fileMetadata: File, fileCount: number) => {
-//     const fileData = Buffer.alloc();
-//     let receivedBytes = 0;
-//     return [fileMetadata, fileData, receivedBytes] as [File, Buffer, number];
-//   }, fileCount => fileCount)
-//   .receive((fileChunk: Uint8Array, [fileMeta, fileData, receivedBytes]) => {
-//     fileData.set(fileChunk, receivedBytes);
-//     receivedBytes += fileChunk.byteLength;
-//     return [fileMeta, fileData, receivedBytes] as [File, Buffer, number]; // some way to fix these to tuple type?
-//   }, ([fileMeta, fileData, receivedBytes]) => () => fileMeta.size === receivedBytes)
-//   .reduce((_, [fileMeta, fileData, receivedBytes]) => {
-//     (fileMeta as any).buffer = fileData;
-//     return fileMeta;
-//   })
-//   .subscribe(async file => {
-    
-//   })
-
-// export class SocketObservable<T> {
-//   // /**
-//   //  * 
-//   //  * @param messageCount 
-//   //  */
-//   // expect(messageCount: number): Expected<SocketObservable<T>> {
-
-//   // }
-
-//   /**
-//    * Emits a value for every message received
-//    */
-//   receive<TMessage extends MessageType, TReturn, TExpect extends number | ((state: T) => number) | ((state: T) => (() => boolean))>(
-//     handler: (this: SocketObservable<never>, message: TMessage, state: T) => TReturn | Promise<TReturn>,
-//     expect?: TExpect
-//     ): [TExpect] extends [number | ((state: T) => number)] ? AggregateSocketObservable<TReturn> : SocketObservable<TReturn> {
-    
-//   }
-  
-//   // for<TOutput>(iterationDeterminator: number | ((state: T) => number), handler: (this: SocketObservable<never>, state: T) => SocketObservable<TOutput>) {
-
-//   // }
-// //handler: (this: SocketObservable<never>, state: T) => TOutput | SocketObservable<TOutput>
-//   // until(stopCondition: (state: T) => boolean): Expected<SocketObservable<T>> {
-
-//   // }
-
-//   subscribe(handler: (emittedValue: T) => void) {
-
-//   }
-
-//   reduce<TMessage extends MessageType, TOutput>(handler: (messages: TMessage[], state: T) => TOutput): TOutput { // reduce
-
-//   }
-// }
-
 class SocketMessageDispatcher implements AsyncGenerator<[RawData, boolean]> {
-  /**
-   *
-   */
   constructor(private socket: WebSocket) {
-    this.messageMutex.lock();
     this.messageGenerator = this.getMessage();
     const messageHandler = async (message: RawData, isBinary: boolean) => {
       this.messageQueue.push([message, isBinary ?? false]);
@@ -92,11 +19,10 @@ class SocketMessageDispatcher implements AsyncGenerator<[RawData, boolean]> {
     this.socket.on('message', messageHandler);
   }
 
-  messageMutex = new Mutex();
-  messageSemaphore = new SemaphoreQueue();
+  messageSemaphore = new Semaphore();
   messageQueue: any[] = [];
 
-  handlerSemaphore = new SemaphoreQueue();
+  handlerSemaphore = new Semaphore();
 
   messageGenerator: AsyncGenerator<[RawData, boolean], void>
 
@@ -144,11 +70,6 @@ class SocketMessageDispatcher implements AsyncGenerator<[RawData, boolean]> {
 
 
 export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
-  id: string = randomUUID();
-
-  /**
-   *
-   */
   constructor(private socket: WebSocket, private dispatcher: SocketMessageDispatcher | null = null) {
     super();
     if (this.dispatcher === null) {
