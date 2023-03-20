@@ -20,11 +20,12 @@ describe('SocketObservable', () => {
     expressWs(app);
     app.ws('/', (socket: WebSocket, req, next) => {
       send = socket.send.bind(socket);
-      socket.on('message', (message, isBinary) => {
-        if ((message as any as string) === '4') {
-          socket.send('?');
-        }
-      })
+      new SocketObservable(socket)
+        .receive((message: number) => {
+          if (message === 4) return '?';
+          return null;
+        })
+        .send((state, skip) => state ?? skip())
     });
     server = app.listen(62335);
     socket = new WebSocket('ws://localhost:62335/');
@@ -142,6 +143,7 @@ describe('SocketObservable', () => {
     await new Promise(res => setTimeout(res, 5000));
     socket.close();
     await new Promise(res => setTimeout(res, 5000));
+    // this test will usually fail if debugging, because the socket closes early
     assert.deepStrictEqual(receivedMessages, outputMessages);
   })
 
