@@ -15,8 +15,6 @@ export class SocketMessageDispatcher implements AsyncGenerator<[RawData, boolean
   messageSemaphore = new Semaphore();
   messageQueue: any[] = [];
 
-  handlerSemaphore = new Semaphore();
-
   messageGenerator: AsyncGenerator<[RawData, boolean], void>
 
   get available() {
