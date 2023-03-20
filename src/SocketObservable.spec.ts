@@ -122,6 +122,43 @@ describe('SocketObservable', () => {
       assert.deepStrictEqual(receivedMessages, outputMessages);
   })
 
+  it('should handle a complex stream of messages', async () => {
+    const messages = [{data: 'hi!', messageLength: 3}];
+    const innerMessages = [['how', 'are', 'you']];
+    const innerInnerMessages = [['today', 'and', 'forever']];
+    const finalMessages = ['?'];
+    const outputMessages = ['hi! how are you today and forever?'];
+    const receivedMessages: string[] = [];
+    new SocketObservable(socket)
+      .receive((message: {data: string, messageLength: number}) => message)
+      .receive((message: string, state): [typeof state, string] => {
+        if (((arg: any): arg is { data: string, messageLength: number} => arg[0] === undefined)(state)) return [state, message];
+        return [state[0], `${state[1]} ${message}`];
+      }, state => result => !!result && result[1].split(' ').length === state.messageLength)
+      .receive((message: string, state): typeof state => {
+        return [state[0], `${state[1]} ${message}`];
+      }, 3)
+      .receive((message: string, state) => {
+        return `${state[0].data} ${state[1]}` + message;
+      })
+      .subscribe(val => {
+        receivedMessages.push(val);
+      });
+    
+    for (const msgIndex in messages) {
+      send(JSON.stringify(messages[msgIndex]));
+      for (const innerMsg of innerMessages[msgIndex]) {
+        send(innerMsg);
+      }
+      for (const innerInnerMsg of innerInnerMessages[msgIndex]) {
+        send(innerInnerMsg);
+      }
+      send(finalMessages[msgIndex]);
+    }
+    await new Promise(res => setTimeout(res, 10000));
+    assert.deepStrictEqual(receivedMessages, outputMessages);
+  })
+
   afterEach(() => {
     socket.close();
     ~socket;
