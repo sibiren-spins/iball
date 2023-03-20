@@ -50,6 +50,11 @@ describe('SocketObservable', () => {
     expressWs(app);
     app.ws('/', (socket: WebSocket, req, next) => {
       send = socket.send.bind(socket);
+      socket.on('message', (message, isBinary) => {
+        if ((message as any as string) === 'is it over?') {
+          socket.send('?');
+        }
+      })
     });
     server = app.listen(62335);
     socket = new WebSocket('ws://localhost:62335/');
@@ -126,9 +131,8 @@ describe('SocketObservable', () => {
     const messages = [{data: 'hi!', messageLength: 3}];
     const innerMessages = [['how', 'are', 'you']];
     const innerInnerMessages = [['today', 'and', 'forever']];
-    const finalMessages = ['?'];
     const outputMessages = ['hi! how are you today and forever?'];
-    const receivedMessages: string[] = [];
+    let receivedMessages: string[] = [];
     new SocketObservable(socket)
       .receive((message: {data: string, messageLength: number}) => message)
       .receive((message: string, state): [typeof state, string] => {
@@ -138,12 +142,19 @@ describe('SocketObservable', () => {
       .receive((message: string, state): typeof state => {
         return [state[0], `${state[1]} ${message}`];
       }, 3)
+      .send('is it over?')
       .receive((message: string, state) => {
         return `${state[0].data} ${state[1]}` + message;
       })
+      .pipe(
+        reduce((acc, val) => {
+          acc.push(val);
+          return acc;
+        }, [] as string[])
+      )
       .subscribe(val => {
-        receivedMessages.push(val);
-      });
+        receivedMessages = val;
+      })
     
     for (const msgIndex in messages) {
       send(JSON.stringify(messages[msgIndex]));
@@ -153,9 +164,10 @@ describe('SocketObservable', () => {
       for (const innerInnerMsg of innerInnerMessages[msgIndex]) {
         send(innerInnerMsg);
       }
-      send(finalMessages[msgIndex]);
     }
-    await new Promise(res => setTimeout(res, 10000));
+    await new Promise(res => setTimeout(res, 5000));
+    socket.close();
+    await new Promise(res => setTimeout(res, 5000));
     assert.deepStrictEqual(receivedMessages, outputMessages);
   })
 
