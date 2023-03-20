@@ -7,6 +7,24 @@ type MessageType = string | number | Uint8Array | object;
 
 type Extract<TInput> = TInput extends SocketObservable<infer R> ? Extract<R> : TInput;
 
+type BufferLike =
+    | string
+    | Buffer
+    | DataView
+    | number
+    | ArrayBufferView
+    | Uint8Array
+    | ArrayBuffer
+    | SharedArrayBuffer
+    | ReadonlyArray<any>
+    | ReadonlyArray<number>
+    | { valueOf(): ArrayBuffer }
+    | { valueOf(): SharedArrayBuffer }
+    | { valueOf(): Uint8Array }
+    | { valueOf(): ReadonlyArray<number> }
+    | { valueOf(): string }
+    | { [Symbol.toPrimitive](hint: string): string }
+
 
 export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
   private dispatcher: SocketMessageDispatcher;
@@ -118,6 +136,9 @@ export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
     return innerObservable;
   }
 
+  send(message: BufferLike, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }) {
+    this.socket.send(message, options ?? {}, undefined);
+    return this;
   }
 }
 
