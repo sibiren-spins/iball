@@ -1,72 +1,12 @@
 import { RawData, WebSocket } from 'ws';
 import { ReplaySubject } from 'rxjs';
-import { randomUUID } from 'node:crypto';
-import { Semaphore } from './Semaphore';
+import { SocketMessageDispatcher } from './SocketMessageDispatcher';
 
 type MessageType = string | number | Uint8Array | object;
 
 type Flatten<TInput> = TInput extends SocketObservable<infer R> ? Flatten<R>[] : TInput;
 
 type Extract<TInput> = TInput extends SocketObservable<infer R> ? Extract<R> : TInput;
-
-class SocketMessageDispatcher implements AsyncGenerator<[RawData, boolean]> {
-  constructor(private socket: WebSocket) {
-    this.messageGenerator = this.getMessage();
-    const messageHandler = async (message: RawData, isBinary: boolean) => {
-      this.messageQueue.push([message, isBinary ?? false]);
-      await this.messageSemaphore.signal();
-    };
-    this.socket.on('message', messageHandler);
-  }
-
-  messageSemaphore = new Semaphore();
-  messageQueue: any[] = [];
-
-  handlerSemaphore = new Semaphore();
-
-  messageGenerator: AsyncGenerator<[RawData, boolean], void>
-
-  get available() {
-    return this.socket.readyState === this.socket.OPEN || this.messageQueue.length > 0;
-  }
-
-  async *getMessage(): AsyncGenerator<[RawData, boolean], void, [RawData, boolean]> {
-    if (this.socket.readyState !== this.socket.OPEN) await this.waitForSocketOpen();
-    while (this.available) {
-      await this.messageSemaphore.wait();
-      const message = this.messageQueue.shift();
-      yield message;
-    }
-    console.log('socket closed.');
-  }
-
-  waitForSocketOpen() {
-    return new Promise<void>((res, rej) => {
-      const resolver = () => {
-        this.socket.off('open', resolver);
-        res();
-      };
-      this.socket.on('open', resolver);
-      setTimeout(rej, 10000);
-    });
-  }
-
-  async next(...args: [] | [unknown]): Promise<IteratorResult<[RawData, boolean], void>> {
-    return await this.messageGenerator.next(...args);
-  }
-
-  async return(value: any): Promise<IteratorResult<[RawData, boolean], void>> {
-    return await this.messageGenerator.return(value);
-  }
-  async throw(e: any): Promise<IteratorResult<[RawData, boolean], void>> {
-    return await this.messageGenerator.throw(e);
-  }
-  [Symbol.asyncIterator](): AsyncGenerator<[RawData, boolean], any, unknown> {
-    return this.messageGenerator;
-  }
-
-
-}
 
 
 export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
