@@ -1,6 +1,6 @@
 {
   "name": "iball",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A fluent, observable API for websockets messaging.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

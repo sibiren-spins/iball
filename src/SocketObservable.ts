@@ -144,12 +144,12 @@ export class SocketObservable<T> extends ReplaySubject<Extract<T>> {
 
   send(message: BufferLike, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }): SocketObservable<T>;
   send(messageTransform: (state: Extract<T>, skip: () => SkipSendSymbol) => BufferLike | SkipSendSymbol, options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }): SocketObservable<T>;
-  send(messageOrMessageTransform: BufferLike | ((state: Extract<T>, skip: () => SkipSendSymbol) => BufferLike | SkipSendSymbol), options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }) {
-    this.subscribe(state => {
+  send(messageOrMessageTransform: BufferLike | ((state: Extract<T>, skip: () => SkipSendSymbol) => (BufferLike | SkipSendSymbol | Promise<BufferLike | SkipSendSymbol>)), options?: { mask?: boolean | undefined; binary?: boolean | undefined; compress?: boolean | undefined; fin?: boolean | undefined }) {
+    this.subscribe(async state => {
       const skip = (): SkipSendSymbol => skipSendSymbol;
       let message: BufferLike | SkipSendSymbol;
       if (typeof messageOrMessageTransform === 'function') {
-        message = messageOrMessageTransform(state, skip);
+        message = await messageOrMessageTransform(state, skip);
       } else {
         message = messageOrMessageTransform;
       }
